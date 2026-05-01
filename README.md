@@ -46,6 +46,27 @@
 
 ---
 
+
+## Circuit Images
+
+### Full Circuit Connection
+
+<div align="center">
+  <img src="images/image1.png" alt="Full circuit connection" width="500"/>
+  <br/>
+  <em>Figure 1: Complete wiring of the Arduino Power Regulator system.</em>
+</div>
+
+### RTC Setup 
+
+<div align="center">
+  <img src="images/image2.png" alt="RTC setup OK LCD screen" width="350"/>
+  <br/>
+  <em>Figure 2: LCD showing successful RTC setup (OK screen).</em>
+</div>
+
+---
+
 ## Overview
 
 Arduino Power Regulator connects two independent relay channels to two separate control strategies — time and ambient light. Relay 1 follows a user-defined ON/OFF schedule stored against the DS1302 real-time clock, cutting or restoring power to a load on a fixed daily timetable. Relay 2 reads ambient brightness from an LDR and switches power automatically when darkness falls below a configurable threshold. Both channels are fully configurable at runtime from a 4x4 keypad, with live status shown on a 16x2 I2C LCD. No PC connection, no re-flashing required — everything is set in the field.
