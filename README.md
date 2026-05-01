@@ -1,7 +1,7 @@
 <div align="center">
 
 # Arduino Power Regulator
-### Dual-Relay Automated Light Control System
+### Relay Automated Power Control System
 
 <br/>
 
@@ -13,7 +13,7 @@
 
 <br/>
 
-> **An Arduino-based automated light controller — scheduling relay switching via a real-time clock and reacting to ambient light levels through an LDR sensor, all configurable from a 4x4 keypad with live LCD feedback.**
+> **An Arduino-based automated power regulator — scheduling relay switching via a real-time clock and cutting power based on ambient light levels through an LDR sensor, all configurable from a 4x4 keypad with live LCD feedback.**
 
 <br/>
 
@@ -48,7 +48,7 @@
 
 ## Overview
 
-Arduino Light Monitor connects two independent relay channels to two separate control strategies — time and light. Relay 1 follows a user-defined ON/OFF schedule stored against the DS1302 real-time clock. Relay 2 reads ambient brightness from an LDR and switches automatically when darkness falls below a configurable threshold. Both channels are fully configurable at runtime from a 4x4 keypad, with live status shown on a 16x2 I2C LCD. No PC connection, no re-flashing required — everything is set in the field.
+Arduino Power Regulator connects two independent relay channels to two separate control strategies — time and ambient light. Relay 1 follows a user-defined ON/OFF schedule stored against the DS1302 real-time clock, cutting or restoring power to a load on a fixed daily timetable. Relay 2 reads ambient brightness from an LDR and switches power automatically when darkness falls below a configurable threshold. Both channels are fully configurable at runtime from a 4x4 keypad, with live status shown on a 16x2 I2C LCD. No PC connection, no re-flashing required — everything is set in the field.
 
 ---
 
@@ -282,9 +282,9 @@ RELAY1 ON
 ## Project Structure
 
 ```
-arduino-light-monitor/
-├── light_monitor.ino    # Main sketch
-└── README.md            # This file
+arduino-power-regulator/
+├── power_regulator.ino    # Main sketch
+└── README.md              # This file
 ```
 
 ---
@@ -297,6 +297,6 @@ This project is open source under the [MIT License](https://opensource.org/licen
 
 <div align="center">
 
-Built for reliable, fieldworthy light automation.
+Built for reliable, fieldworthy power regulation.
 
 </div>
