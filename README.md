@@ -1,6 +1,6 @@
 <div align="center">
 
-# Arduino Light Monitor
+# Arduino Power Regulator
 ### Dual-Relay Automated Light Control System
 
 <br/>
