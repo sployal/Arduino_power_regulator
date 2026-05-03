@@ -8,8 +8,8 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 ThreeWire myWire(7, 6, 8);
 RtcDS1302<ThreeWire> Rtc(myWire);
 
-const int RELAY1_PIN = 13;   // Schedule-controlled relay
-const int RELAY2_PIN = A1;   // LDR-controlled relay
+const int RELAY1_PIN = 13;
+const int RELAY2_PIN = A1;
 const int LDR_PIN    = A0;
 
 const byte ROWS = 4;
@@ -31,8 +31,28 @@ bool scheduleSet = false;
 bool relay1State = false;
 
 // ── Relay 2 (LDR) ────────────────────────────────────────────────────────────
-int  ldrThreshold = 400;   // default: 0-1023, ON when raw < threshold (dark)
-bool relay2State  = false;
+// Hysteresis band: relay turns ON below (threshold - HYST_BAND),
+//                  relay turns OFF above (threshold + HYST_BAND)
+const int HYST_BAND   = 20;
+int  ldrThreshold     = 400;
+bool relay2State      = false;
+
+// ── LDR smoothing (simple moving average over 5 samples) ─────────────────────
+const int  LDR_SAMPLES = 5;
+int        ldrBuffer[LDR_SAMPLES];
+int        ldrIndex     = 0;
+bool       ldrReady     = false;   // true once buffer is fully populated
+
+int readSmoothedLDR() {
+  ldrBuffer[ldrIndex] = analogRead(LDR_PIN);
+  ldrIndex = (ldrIndex + 1) % LDR_SAMPLES;
+  if (ldrIndex == 0) ldrReady = true;
+
+  int count = ldrReady ? LDR_SAMPLES : ldrIndex;
+  long sum  = 0;
+  for (int i = 0; i < count; i++) sum += ldrBuffer[i];
+  return (int)(sum / count);
+}
 
 // ── Menu ─────────────────────────────────────────────────────────────────────
 enum State {
@@ -57,7 +77,8 @@ void applyRelay1() {
 }
 
 void applyRelay2() {
-  digitalWrite(RELAY2_PIN, relay2State ? HIGH : LOW);
+  // Relay module is active-LOW: LOW = relay ON, HIGH = relay OFF
+  digitalWrite(RELAY2_PIN, relay2State ? LOW : HIGH);
 }
 
 void handleBackspace(const char* promptLine1, const char* labelPrefix) {
@@ -85,6 +106,11 @@ void setup() {
   relay2State = false;
   applyRelay1();
   applyRelay2();
+
+  // Pre-fill LDR smoothing buffer with first real reading
+  int firstRead = analogRead(LDR_PIN);
+  for (int i = 0; i < LDR_SAMPLES; i++) ldrBuffer[i] = firstRead;
+  ldrReady = true;
 
   lcd.init();
   lcd.backlight();
@@ -116,6 +142,7 @@ void updateRelay1(int h, int m) {
   if (onMins < offMins) {
     shouldBeOn = (nowMins >= onMins && nowMins < offMins);
   } else {
+    // Overnight schedule (e.g. 22:00 → 06:00)
     shouldBeOn = (nowMins >= onMins || nowMins < offMins);
   }
 
@@ -126,23 +153,36 @@ void updateRelay1(int h, int m) {
   }
 }
 
-// ── Relay 2 LDR control ──────────────────────────────────────────────────────
+// ── Relay 2 LDR control (with hysteresis) ────────────────────────────────────
 
 void updateRelay2() {
-  int raw = analogRead(LDR_PIN);
-  bool shouldBeOn = (raw < ldrThreshold);   // dark = ON
+  int raw = readSmoothedLDR();
+
+  // Only switch ON when clearly dark (below lower bound)
+  // Only switch OFF when clearly bright (above upper bound)
+  // In between: hold current state → NO flickering at the boundary
+  int lowerBound = ldrThreshold - HYST_BAND;   // e.g. 380
+  int upperBound = ldrThreshold + HYST_BAND;   // e.g. 420
+
+  bool shouldBeOn = relay2State;   // default: keep current state
+
+  if (raw < lowerBound) {
+    shouldBeOn = true;   // dark → ON
+  } else if (raw > upperBound) {
+    shouldBeOn = false;  // bright → OFF
+  }
+  // if lowerBound <= raw <= upperBound: do nothing (hold state)
 
   if (shouldBeOn != relay2State) {
     relay2State = shouldBeOn;
     applyRelay2();
-    Serial.print("RELAY2 "); Serial.println(relay2State ? "ON" : "OFF");
+    Serial.print("RELAY2 "); Serial.println(relay2State ? "OFF" : "ON");
   }
 }
 
 // ── Normal screen ─────────────────────────────────────────────────────────────
 
 void showNormalScreen(RtcDateTime& now) {
-  // Row 0: time + both relay states
   char row0[17];
   snprintf(row0, sizeof(row0), "%02d:%02d:%02d R1:%s",
            now.Hour(), now.Minute(), now.Second(),
@@ -150,11 +190,10 @@ void showNormalScreen(RtcDateTime& now) {
   lcd.setCursor(0, 0);
   lcd.print(row0);
 
-  // Row 1: date + relay2 state
   char row1[17];
   snprintf(row1, sizeof(row1), "D:%02d/%02d/%02d R2:%s",
            now.Day(), now.Month(), now.Year() % 100,
-           relay2State ? "ON " : "OFF");
+           relay2State ? "OFF" : "ON ");
   lcd.setCursor(0, 1);
   lcd.print(row1);
 }
@@ -177,8 +216,8 @@ void handleKey(char key) {
         snprintf(buf, sizeof(buf), "Cur:%4d (0-1023)", ldrThreshold);
         printPrompt("Set LDR Thresh  ", buf);
       } else if (key == 'D') {
-        scheduleSet  = false;
-        relay1State  = !relay1State;
+        scheduleSet = false;
+        relay1State = !relay1State;
         applyRelay1();
         printPrompt(relay1State ? "R1 ON (manual)  " : "R1 OFF (manual) ", "");
         delay(1000);
@@ -384,14 +423,14 @@ void loop() {
     updateRelay2();
     showNormalScreen(now);
 
-    int raw = analogRead(LDR_PIN);
+    int raw = readSmoothedLDR();
     Serial.print("Time=");      Serial.print(now.Hour());
     Serial.print(":");          Serial.print(now.Minute());
     Serial.print(":");          Serial.print(now.Second());
     Serial.print("  Light=");   Serial.print(raw);
     Serial.print("  Thresh=");  Serial.print(ldrThreshold);
     Serial.print("  R1=");      Serial.print(relay1State ? "ON" : "OFF");
-    Serial.print("  R2=");      Serial.println(relay2State ? "ON" : "OFF");
+    Serial.print("  R2=");      Serial.println(relay2State ? "OFF" : "ON");
   }
 
   delay(300);
