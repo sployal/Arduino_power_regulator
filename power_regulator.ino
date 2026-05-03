@@ -36,6 +36,7 @@ bool relay1State = false;
 const int HYST_BAND   = 20;
 int  ldrThreshold     = 400;
 bool relay2State      = false;
+bool ldrManual        = false;   // true = LDR control suspended (manual override)
 
 // ── LDR smoothing (simple moving average over 5 samples) ─────────────────────
 const int  LDR_SAMPLES = 5;
@@ -125,7 +126,7 @@ void setup() {
     while (true);
   }
 
-  printPrompt("A=Schedule B=LDR", "D=Man.Tgl R1    ");
+  printPrompt("A=Sched B=LDR   ", "C=TglR2 D=TglR1 ");
   delay(1800);
 }
 
@@ -156,6 +157,7 @@ void updateRelay1(int h, int m) {
 // ── Relay 2 LDR control (with hysteresis) ────────────────────────────────────
 
 void updateRelay2() {
+  if (ldrManual) return;   // manual override active — skip LDR control
   int raw = readSmoothedLDR();
 
   // Only switch ON when clearly dark (below lower bound)
@@ -215,6 +217,13 @@ void handleKey(char key) {
         char buf[17];
         snprintf(buf, sizeof(buf), "Cur:%4d (0-1023)", ldrThreshold);
         printPrompt("Set LDR Thresh  ", buf);
+      } else if (key == 'C') {
+        ldrManual   = false;
+        relay2State = !relay2State;
+        applyRelay2();
+        printPrompt(relay2State ? "R2 ON (manual)  " : "R2 OFF (manual) ", "");
+        ldrManual = true;
+        delay(1000);
       } else if (key == 'D') {
         scheduleSet = false;
         relay1State = !relay1State;
